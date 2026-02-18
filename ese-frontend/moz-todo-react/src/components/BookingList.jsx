@@ -1,10 +1,14 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
 
 function BookingList() {
+  const { user } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("all");
+  const [editingBooking, setEditingBooking] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
 
   const apiURL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -76,6 +80,63 @@ function BookingList() {
         setError("Failed to update booking status");
       });
   }
+
+  function startEditing(booking) {
+    setEditingBooking(booking.id);
+    setEditFormData({
+      full_name: booking.full_name,
+      email: booking.email,
+      service: booking.service,
+      booking_date: booking.booking_date,
+      booking_time: booking.booking_time,
+      notes: booking.notes || ""
+    });
+  }
+
+  function cancelEditing() {
+    setEditingBooking(null);
+    setEditFormData({});
+    setError("");
+  }
+
+  function saveEdit(id) {
+    const token = localStorage.getItem("access_token");
+
+    fetch(`${apiURL}/api/bookings/${id}/`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(editFormData),
+    })
+      .then((response) => response.json())
+      .then((updatedBooking) => {
+        setBookings(
+          bookings.map((booking) =>
+            booking.id === id ? updatedBooking : booking
+          )
+        );
+        setEditingBooking(null);
+        setEditFormData({});
+        setError("");
+      })
+      .catch((error) => {
+        setError("Failed to update booking");
+      });
+  }
+
+  const serviceOptions = [
+    "Haircut",
+    "Hair Coloring",
+    "Massage",
+    "Facial",
+    "Manicure",
+    "Pedicure",
+    "Spa Treatment",
+    "Consultation",
+    "Other"
+  ];
 
   function getStatusBadgeClass(status) {
     const classes = {
@@ -151,6 +212,93 @@ function BookingList() {
         <div className="bookings-grid">
           {filteredBookings.map((booking) => (
             <div key={booking.id} className="booking-card">
+              {editingBooking === booking.id ? (
+                // Edit Mode
+                <div className="booking-edit-form">
+                  <h3>Edit Booking</h3>
+                  <div className="form-group">
+                    <label>Full Name</label>
+                    <input
+                      type="text"
+                      className="input input__lg"
+                      value={editFormData.full_name}
+                      onChange={(e) => setEditFormData({...editFormData, full_name: e.target.value})}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      className="input input__lg"
+                      value={editFormData.email}
+                      onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Service</label>
+                    <select
+                      className="input input__lg"
+                      value={editFormData.service}
+                      onChange={(e) => setEditFormData({...editFormData, service: e.target.value})}
+                    >
+                      {serviceOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Date</label>
+                      <input
+                        type="date"
+                        className="input input__lg"
+                        value={editFormData.booking_date}
+                        onChange={(e) => setEditFormData({...editFormData, booking_date: e.target.value})}
+                        min={new Date().toISOString().split('T')[0]}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Time</label>
+                      <input
+                        type="time"
+                        className="input input__lg"
+                        value={editFormData.booking_time}
+                        onChange={(e) => setEditFormData({...editFormData, booking_time: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label>Notes</label>
+                    <textarea
+                      className="input input__lg"
+                      rows="3"
+                      value={editFormData.notes}
+                      onChange={(e) => setEditFormData({...editFormData, notes: e.target.value})}
+                    />
+                  </div>
+                  {booking.status !== 'pending' && (
+                    <p className="edit-warning">⚠️ Editing this booking will reset its status to "pending"</p>
+                  )}
+                  <div className="booking-actions">
+                    <button
+                      className="btn btn__primary"
+                      onClick={() => saveEdit(booking.id)}
+                    >
+                      Save Changes
+                    </button>
+                    <button
+                      className="btn"
+                      onClick={cancelEditing}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // View Mode
+                <>
               <div className="booking-header">
                 <h3>{booking.full_name}</h3>
                 <span className={getStatusBadgeClass(booking.status)}>
@@ -184,16 +332,24 @@ function BookingList() {
               </div>
 
               <div className="booking-actions">
-                <select
-                  value={booking.status}
-                  onChange={(e) => updateBookingStatus(booking.id, e.target.value)}
-                  className="status-select"
+                {user?.is_superuser && (
+                  <select
+                    value={booking.status}
+                    onChange={(e) => updateBookingStatus(booking.id, e.target.value)}
+                    className="status-select"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                )}
+                <button
+                  className="btn btn__primary"
+                  onClick={() => startEditing(booking)}
                 >
-                  <option value="pending">Pending</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="cancelled">Cancelled</option>
-                  <option value="completed">Completed</option>
-                </select>
+                  Edit
+                </button>
                 <button
                   className="btn btn__danger"
                   onClick={() => deleteBooking(booking.id)}
@@ -201,6 +357,8 @@ function BookingList() {
                   Delete
                 </button>
               </div>
+              </>
+              )}
             </div>
           ))}
         </div>

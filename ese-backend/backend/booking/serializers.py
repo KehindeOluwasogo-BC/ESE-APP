@@ -15,4 +15,7 @@ class BookingSerializer(serializers.ModelSerializer):
         if request and not request.user.is_superuser:
             # Remove status from validated_data if user is not a superuser
             validated_data.pop('status', None)
+            # If the booking was previously confirmed/completed/cancelled, reset to pending
+            if instance.status != 'pending':
+                instance.status = 'pending'
         return super().update(instance, validated_data)
