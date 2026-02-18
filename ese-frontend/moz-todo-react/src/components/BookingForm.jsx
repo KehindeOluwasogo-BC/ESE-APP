@@ -18,7 +18,7 @@ function BookingForm({ onBookingCreated }) {
   // Auto-populate name and email from logged-in user
   useEffect(() => {
     if (user) {
-      setFullName(user.full_name || user.username || "");
+      setFullName(user.full_name || "");
       setEmail(user.email || "");
     }
   }, [user]);

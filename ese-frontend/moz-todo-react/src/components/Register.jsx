@@ -2,6 +2,8 @@ import { useState } from "react";
 
 function Register({ onRegister, onSwitchToLogin }) {
   const [username, setUsername] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -29,7 +31,7 @@ function Register({ onRegister, onSwitchToLogin }) {
     fetch(`${apiURL}/api/auth/register/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, email, password }),
+      body: JSON.stringify({ username, first_name: firstName, last_name: lastName, email, password }),
     })
       .then((response) => {
         if (!response.ok) {
@@ -44,6 +46,8 @@ function Register({ onRegister, onSwitchToLogin }) {
         localStorage.setItem("refresh_token", data.refresh);
         onRegister(data);
         setUsername("");
+        setFirstName("");
+        setLastName("");
         setEmail("");
         setPassword("");
         setConfirmPassword("");
@@ -72,6 +76,32 @@ function Register({ onRegister, onSwitchToLogin }) {
             onChange={(e) => setUsername(e.target.value)}
             required
             autoComplete="username"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="firstName">First Name</label>
+          <input
+            type="text"
+            id="firstName"
+            className="input input__lg"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            required
+            autoComplete="given-name"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="lastName">Last Name</label>
+          <input
+            type="text"
+            id="lastName"
+            className="input input__lg"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            required
+            autoComplete="family-name"
           />
         </div>
 

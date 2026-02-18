@@ -6,13 +6,15 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('username', 'password', 'email')
+        fields = ('username', 'password', 'email', 'first_name', 'last_name')
 
     def create(self, validated_data):
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data['email'],
-            password=validated_data['password']
+            password=validated_data['password'],
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', '')
         )
         return user
 
@@ -24,6 +26,4 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ('id', 'username', 'email', 'first_name', 'last_name', 'full_name')
     
     def get_full_name(self, obj):
-        if obj.first_name or obj.last_name:
-            return f"{obj.first_name} {obj.last_name}".strip()
-        return obj.username
+        return f"{obj.first_name} {obj.last_name}".strip()
