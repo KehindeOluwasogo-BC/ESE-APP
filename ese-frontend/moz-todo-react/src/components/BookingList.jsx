@@ -278,7 +278,7 @@ function BookingList() {
                       onChange={(e) => setEditFormData({...editFormData, notes: e.target.value})}
                     />
                   </div>
-                  {booking.status !== 'pending' && (
+                  {booking.status !== 'pending' && !user?.is_superuser && (
                     <p className="edit-warning">⚠️ Editing this booking will reset its status to "pending"</p>
                   )}
                   <div className="booking-actions">
