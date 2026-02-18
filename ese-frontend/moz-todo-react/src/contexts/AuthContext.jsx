@@ -7,19 +7,50 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Check if user is already logged in
+  const apiURL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+  const fetchUserInfo = async () => {
     const token = localStorage.getItem("access_token");
-    if (token) {
-      setIsAuthenticated(true);
-      // You could add token validation here
+    if (!token) {
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    try {
+      const response = await fetch(`${apiURL}/api/auth/user/`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+        setIsAuthenticated(true);
+      } else {
+        // Token might be invalid
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        setIsAuthenticated(false);
+        setUser(null);
+      }
+    } catch (error) {
+      console.error("Error fetching user info:", error);
+      setIsAuthenticated(false);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserInfo();
   }, []);
 
-  const login = (data) => {
+  const login = async (data) => {
     setIsAuthenticated(true);
-    setUser(data);
+    // Fetch user info after login
+    await fetchUserInfo();
   };
 
   const logout = () => {
@@ -29,9 +60,10 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  const register = (data) => {
+  const register = async (data) => {
     setIsAuthenticated(true);
-    setUser(data);
+    // Fetch user info after registration
+    await fetchUserInfo();
   };
 
   return (

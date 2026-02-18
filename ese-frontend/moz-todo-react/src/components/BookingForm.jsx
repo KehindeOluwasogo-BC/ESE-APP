@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
 
 function BookingForm({ onBookingCreated }) {
+  const { user } = useAuth();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [service, setService] = useState("");
@@ -12,6 +14,14 @@ function BookingForm({ onBookingCreated }) {
   const [success, setSuccess] = useState(false);
 
   const apiURL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+  // Auto-populate name and email from logged-in user
+  useEffect(() => {
+    if (user) {
+      setFullName(user.full_name || user.username || "");
+      setEmail(user.email || "");
+    }
+  }, [user]);
 
   const serviceOptions = [
     "Haircut",
