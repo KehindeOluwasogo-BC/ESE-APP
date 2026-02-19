@@ -11,9 +11,21 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# SendGrid Configuration
+SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
+FROM_EMAIL = os.getenv('FROM_EMAIL')
+
+# Frontend URL for password reset links
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://psychic-halibut-x496qg74656f9vqx-3000.app.github.dev/')
 
 
 # Quick-start development settings - unsuitable for production

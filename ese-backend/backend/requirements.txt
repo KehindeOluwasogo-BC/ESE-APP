@@ -2,3 +2,6 @@ django
 djangorestframework 
 django-cors-headers
 djangorestframework_simplejwt
+pip install sendgrid==6.12.5
+python-http-client==3.3.7 
+python-dotenv
