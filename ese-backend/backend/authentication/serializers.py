@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
+from .models import UserProfile
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -21,15 +22,32 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ('profile_picture', 'bio', 'created_at', 'updated_at')
+        read_only_fields = ('created_at', 'updated_at')
+
+
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
+    profile_picture = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'is_superuser')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'is_superuser', 'profile_picture')
     
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip()
+    
+    def get_profile_picture(self, obj):
+        if hasattr(obj, 'profile') and obj.profile.profile_picture:
+            return obj.profile.profile_picture
+        return None
+
+
+class UpdateProfilePictureSerializer(serializers.Serializer):
+    profile_picture = serializers.URLField(max_length=500)
 
 
 class PasswordResetRequestSerializer(serializers.Serializer):

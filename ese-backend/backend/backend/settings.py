@@ -25,7 +25,7 @@ SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
 FROM_EMAIL = os.getenv('FROM_EMAIL')
 
 # Frontend URL for password reset links
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://psychic-halibut-x496qg74656f9vqx-3000.app.github.dev/')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://psychic-halibut-x496qg74656f9vqx-3000.app.github.dev')
 
 
 # Quick-start development settings - unsuitable for production

@@ -6,8 +6,14 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import status
 from rest_framework.views import APIView
 
-from .serializers import RegisterSerializer, UserSerializer, PasswordResetRequestSerializer, PasswordResetConfirmSerializer
-from .models import PasswordResetToken
+from .serializers import (
+    RegisterSerializer, 
+    UserSerializer, 
+    PasswordResetRequestSerializer, 
+    PasswordResetConfirmSerializer,
+    UpdateProfilePictureSerializer
+)
+from .models import PasswordResetToken, PasswordResetAttempt, UserProfile
 from .utils import generate_reset_token, send_password_reset_email
 
 
@@ -42,6 +48,25 @@ class RequestPasswordResetView(APIView):
         serializer = PasswordResetRequestSerializer(data=request.data)
         if serializer.is_valid():
             email = serializer.validated_data['email']
+            
+            # Check rate limiting
+            is_limited, seconds_remaining = PasswordResetAttempt.is_rate_limited(email)
+            if is_limited:
+                minutes_remaining = seconds_remaining // 60
+                seconds_in_minute = seconds_remaining % 60
+                return Response({
+                    'error': 'Too many reset attempts. Please try again later.',
+                    'rate_limited': True,
+                    'seconds_remaining': seconds_remaining,
+                    'retry_message': f'Please wait {minutes_remaining} minutes and {seconds_in_minute} seconds before trying again.'
+                }, status=status.HTTP_429_TOO_MANY_REQUESTS)
+            
+            # Log this attempt
+            PasswordResetAttempt.objects.create(email=email)
+            
+            # Clean up old attempts (optional optimization)
+            PasswordResetAttempt.cleanup_old_attempts()
+            
             user = User.objects.get(email=email)
             
             # Generate token
@@ -135,5 +160,27 @@ class ResetPasswordView(APIView):
                 return Response({
                     'error': 'Invalid token.'
                 }, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UpdateProfilePictureView(APIView):
+    permission_classes = (IsAuthenticated,)
+    
+    def post(self, request):
+        serializer = UpdateProfilePictureSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            profile_picture_url = serializer.validated_data['profile_picture']
+            
+            # Get or create user profile
+            profile, created = UserProfile.objects.get_or_create(user=request.user)
+            profile.profile_picture = profile_picture_url
+            profile.save()
+            
+            return Response({
+                'message': 'Profile picture updated successfully',
+                'profile_picture': profile_picture_url
+            }, status=status.HTTP_200_OK)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
