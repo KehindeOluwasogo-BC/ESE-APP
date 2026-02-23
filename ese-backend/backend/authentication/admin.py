@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import PasswordResetToken, PasswordResetAttempt, UserProfile, AdminActivityLog
+from .models import PasswordResetToken, PasswordResetAttempt, UserProfile, AdminActivityLog, AccountHistory
 
 
 @admin.register(UserProfile)
@@ -33,3 +33,12 @@ class AdminActivityLogAdmin(admin.ModelAdmin):
     search_fields = ('admin_user__username', 'target_user__username', 'description')
     readonly_fields = ('timestamp',)
     date_hierarchy = 'timestamp'
+
+
+@admin.register(AccountHistory)
+class AccountHistoryAdmin(admin.ModelAdmin):
+    list_display = ('user', 'event_type', 'performed_by', 'event_timestamp', 'ip_address')
+    list_filter = ('event_type', 'event_timestamp')
+    search_fields = ('user__username', 'performed_by__username', 'description')
+    readonly_fields = ('event_timestamp',)
+    date_hierarchy = 'event_timestamp'

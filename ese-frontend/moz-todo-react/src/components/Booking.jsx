@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
 import BookingForm from "./BookingForm";
 import BookingList from "./BookingList";
 
 function Booking() {
-  const [activeTab, setActiveTab] = useState("create");
+  const { user } = useAuth();
+  const isAdmin = user?.is_superuser;
+  const [activeTab, setActiveTab] = useState(isAdmin ? "view" : "create");
   const [refreshList, setRefreshList] = useState(0);
 
   function handleBookingCreated(newBooking) {
@@ -14,12 +17,14 @@ function Booking() {
   return (
     <div className="booking-container">
       <div className="booking-tabs">
-        <button
-          className={`tab-button ${activeTab === "create" ? "active" : ""}`}
-          onClick={() => setActiveTab("create")}
-        >
-          Create Booking
-        </button>
+        {!isAdmin && (
+          <button
+            className={`tab-button ${activeTab === "create" ? "active" : ""}`}
+            onClick={() => setActiveTab("create")}
+          >
+            Create Booking
+          </button>
+        )}
         <button
           className={`tab-button ${activeTab === "view" ? "active" : ""}`}
           onClick={() => setActiveTab("view")}
@@ -29,7 +34,7 @@ function Booking() {
       </div>
 
       <div className="booking-content">
-        {activeTab === "create" ? (
+        {activeTab === "create" && !isAdmin ? (
           <BookingForm onBookingCreated={handleBookingCreated} />
         ) : (
           <BookingList key={refreshList} />

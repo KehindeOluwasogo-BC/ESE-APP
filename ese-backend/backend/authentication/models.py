@@ -120,3 +120,28 @@ class AdminActivityLog(models.Model):
     
     def __str__(self):
         return f"{self.admin_user.username} - {self.get_action_display()} at {self.timestamp}"
+
+
+class AccountHistory(models.Model):
+    """Track account lifecycle events (creation, revocation, deletion)"""
+    EVENT_CHOICES = [
+        ('CREATED', 'Account Created'),
+        ('REVOKED', 'Admin Privileges Revoked'),
+        ('DELETED', 'Account Deleted'),
+        ('REACTIVATED', 'Account Reactivated'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='account_history')
+    event_type = models.CharField(max_length=20, choices=EVENT_CHOICES)
+    performed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='performed_account_actions')
+    description = models.TextField(blank=True)
+    event_timestamp = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-event_timestamp']
+        verbose_name = 'Account History'
+        verbose_name_plural = 'Account Histories'
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.get_event_type_display()} at {self.event_timestamp}"

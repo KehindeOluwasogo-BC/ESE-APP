@@ -13,7 +13,7 @@ from .serializers import (
     PasswordResetConfirmSerializer,
     UpdateProfilePictureSerializer
 )
-from .models import PasswordResetToken, PasswordResetAttempt, UserProfile
+from .models import PasswordResetToken, PasswordResetAttempt, UserProfile, AccountHistory
 from .utils import generate_reset_token, send_password_reset_email
 
 
@@ -26,6 +26,16 @@ class RegisterView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        
+        # Log account creation in AccountHistory
+        AccountHistory.objects.create(
+            user=user,
+            event_type='CREATED',
+            performed_by=None,  # Self-registration
+            description="Self-registered account",
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+        
         refresh = RefreshToken.for_user(user)
         return Response({
             'refresh': str(refresh),
@@ -212,13 +222,22 @@ class CreateAdminView(APIView):
         if serializer.is_valid():
             new_admin = serializer.save()
             
-            # Log the activity
-            from .models import AdminActivityLog
+            # Log the activity in AdminActivityLog
+            from .models import AdminActivityLog, AccountHistory
             AdminActivityLog.objects.create(
                 admin_user=request.user,
                 action='CREATE_ADMIN',
                 target_user=new_admin,
                 description=f"Created admin user: {new_admin.username}",
+                ip_address=self.get_client_ip(request)
+            )
+            
+            # Log in AccountHistory
+            AccountHistory.objects.create(
+                user=new_admin,
+                event_type='CREATED',
+                performed_by=request.user,
+                description=f"Admin account created by {request.user.username}",
                 ip_address=self.get_client_ip(request)
             )
             
@@ -308,13 +327,22 @@ class RevokeAdminPrivilegesView(APIView):
             target_user.is_staff = False
             target_user.save()
             
-            # Log the activity
+            # Log the activity in AdminActivityLog
             from .models import AdminActivityLog
             AdminActivityLog.objects.create(
                 admin_user=request.user,
                 action='REVOKE_ADMIN',
                 target_user=target_user,
                 description=f"Revoked admin privileges from: {target_user.username}",
+                ip_address=self.get_client_ip(request)
+            )
+            
+            # Log in AccountHistory
+            AccountHistory.objects.create(
+                user=target_user,
+                event_type='REVOKED',
+                performed_by=request.user,
+                description=f"Admin privileges revoked by {request.user.username}",
                 ip_address=self.get_client_ip(request)
             )
             
@@ -366,3 +394,83 @@ class AdminActivityLogView(APIView):
             'logs': serializer.data,
             'count': len(serializer.data)
         }, status=status.HTTP_200_OK)
+
+
+class ListUsersView(APIView):
+    """List all regular (non-admin) users - only accessible by super users"""
+    permission_classes = (IsAuthenticated,)
+    
+    def get(self, request):
+        if not request.user.is_superuser:
+            return Response({
+                'error': 'Only super users can view user list.'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        # Get all regular users (not superusers)
+        users = User.objects.filter(is_superuser=False).order_by('-date_joined')
+        
+        from .serializers import UserSerializer
+        serializer = UserSerializer(users, many=True)
+        
+        return Response({
+            'users': serializer.data,
+            'count': users.count()
+        }, status=status.HTTP_200_OK)
+
+
+class CreateUserAccountView(APIView):
+    """Allow admins to create regular user accounts"""
+    permission_classes = (IsAuthenticated,)
+    
+    def get_client_ip(self, request):
+        """Get client IP address from request"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+    
+    def post(self, request):
+        # Check if requesting user is a superuser
+        if not request.user.is_superuser:
+            return Response({
+                'error': 'Only super users can create user accounts.'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        serializer = RegisterSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            new_user = serializer.save()
+            
+            # Log in AccountHistory
+            AccountHistory.objects.create(
+                user=new_user,
+                event_type='CREATED',
+                performed_by=request.user,
+                description=f"User account created by admin {request.user.username}",
+                ip_address=self.get_client_ip(request)
+            )
+            
+            # Log admin activity
+            from .models import AdminActivityLog
+            AdminActivityLog.objects.create(
+                admin_user=request.user,
+                action='OTHER',
+                target_user=new_user,
+                description=f"Created user account: {new_user.username}",
+                ip_address=self.get_client_ip(request)
+            )
+            
+            return Response({
+                'message': f'User account {new_user.username} created successfully.',
+                'user': {
+                    'id': new_user.id,
+                    'username': new_user.username,
+                    'email': new_user.email,
+                    'first_name': new_user.first_name,
+                    'last_name': new_user.last_name
+                }
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

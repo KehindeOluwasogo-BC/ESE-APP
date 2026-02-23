@@ -7,6 +7,8 @@ import ResetPassword from "./components/ResetPassword";
 import Booking from "./components/Booking";
 import Profile from "./components/Profile";
 import AdminManagement from "./components/AdminManagement";
+import UserManagement from "./components/UserManagement";  
+import RegisterUser from "./components/RegisterUser";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
 function AuthPage() {
@@ -40,10 +42,14 @@ function Dashboard() {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
 
   const isProfilePage = location.pathname === '/profile';
   const isBookingsPage = location.pathname === '/bookings' || location.pathname === '/';
   const isAdminPage = location.pathname === '/admin';
+  const isUsersPage = location.pathname === '/users';
+  const isCreateUserPage = location.pathname === '/create-user';
+  const isCreateAdminPage = location.pathname === '/create-admin';
 
   return (
     <div className="app-container">
@@ -56,6 +62,14 @@ function Dashboard() {
           >
             Bookings
           </button>
+          {user?.is_superuser && (
+            <button 
+              className={`nav-button ${isUsersPage ? 'active' : ''}`}
+              onClick={() => navigate('/users')}
+            >
+              Users
+            </button>
+          )}
           <button 
             className={`nav-button ${isProfilePage ? 'active' : ''}`}
             onClick={() => navigate('/profile')}
@@ -63,11 +77,71 @@ function Dashboard() {
             Profile
           </button>
           {user?.is_superuser && (
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <button 
+                className={`nav-button ${isCreateUserPage || isCreateAdminPage ? 'active' : ''}`}
+                onClick={() => setShowAccountDropdown(!showAccountDropdown)}
+              >
+                Create Account ▾
+              </button>
+              {showAccountDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  background: 'white',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                  minWidth: '200px',
+                  zIndex: 1000,
+                  marginTop: '0.5rem'
+                }}>
+                  <button
+                    onClick={() => {
+                      navigate('/create-user');
+                      setShowAccountDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      textAlign: 'left',
+                      background: isCreateUserPage ? '#f0f8ff' : 'white',
+                      border: 'none',
+                      borderBottom: '1px solid #eee',
+                      cursor: 'pointer',
+                      fontSize: '1rem'
+                    }}
+                  >
+                    Create User
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/create-admin');
+                      setShowAccountDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      textAlign: 'left',
+                      background: isCreateAdminPage ? '#f0f8ff' : 'white',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '1rem'
+                    }}
+                  >
+                    Create Admin
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          {user?.is_superuser && (
             <button 
               className={`nav-button ${isAdminPage ? 'active' : ''}`}
               onClick={() => navigate('/admin')}
             >
-              Admin
+              Admin Logs
             </button>
           )}
           <button className="btn btn__danger" onClick={logout}>
@@ -80,6 +154,9 @@ function Dashboard() {
         <Routes>
           <Route path="/bookings" element={<Booking />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/users" element={<UserManagement />} />
+          <Route path="/create-user" element={<RegisterUser />} />
+          <Route path="/create-admin" element={<AdminManagement />} />
           <Route path="/admin" element={<AdminManagement />} />
           <Route path="/" element={<Navigate to="/bookings" replace />} />
         </Routes>

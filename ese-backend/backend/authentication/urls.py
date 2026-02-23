@@ -14,7 +14,9 @@ from .views import (
     CreateAdminView,
     ListAdminsView,
     RevokeAdminPrivilegesView,
-    AdminActivityLogView
+    AdminActivityLogView,
+    ListUsersView,
+    CreateUserAccountView
 )
 
 urlpatterns = [
@@ -31,4 +33,7 @@ urlpatterns = [
     path('admin/list/', ListAdminsView.as_view(), name='list_admins'),
     path('admin/revoke/', RevokeAdminPrivilegesView.as_view(), name='revoke_admin'),
     path('admin/activity-logs/', AdminActivityLogView.as_view(), name='admin_activity_logs'),
+    # User management endpoints
+    path('users/list/', ListUsersView.as_view(), name='list_users'),
+    path('users/create/', CreateUserAccountView.as_view(), name='create_user'),
 ]
