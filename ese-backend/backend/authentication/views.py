@@ -474,3 +474,215 @@ class CreateUserAccountView(APIView):
             }, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ChangeUserPasswordView(APIView):
+    """Allow admins to change any user's password"""
+    permission_classes = (IsAuthenticated,)
+    
+    def get_client_ip(self, request):
+        """Get client IP address from request"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+    
+    def post(self, request):
+        # Only superusers can change passwords
+        if not request.user.is_superuser:
+            return Response({
+                'error': 'Only super users can change user passwords.'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        user_id = request.data.get('user_id')
+        new_password = request.data.get('new_password')
+        
+        if not user_id or not new_password:
+            return Response({
+                'error': 'user_id and new_password are required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            target_user = User.objects.get(id=user_id)
+            
+            # Validate password
+            from django.contrib.auth.password_validation import validate_password
+            try:
+                validate_password(new_password, target_user)
+            except Exception as e:
+                return Response({
+                    'error': str(e)
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Set new password
+            target_user.set_password(new_password)
+            target_user.save()
+            
+            # Log admin activity
+            from .models import AdminActivityLog
+            AdminActivityLog.objects.create(
+                admin_user=request.user,
+                action='OTHER',
+                target_user=target_user,
+                description=f"Changed password for user: {target_user.username}",
+                ip_address=self.get_client_ip(request)
+            )
+            
+            return Response({
+                'message': f'Password changed successfully for {target_user.username}.'
+            }, status=status.HTTP_200_OK)
+        
+        except User.DoesNotExist:
+            return Response({
+                'error': 'User not found.'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+
+class SendResetLinkView(APIView):
+    """Allow admins to send password reset link to a user"""
+    permission_classes = (IsAuthenticated,)
+    
+    def get_client_ip(self, request):
+        """Get client IP address from request"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+    
+    def post(self, request):
+        # Only superusers can send reset links to other users
+        if not request.user.is_superuser:
+            return Response({
+                'error': 'Only super users can send reset links to users.'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        user_id = request.data.get('user_id')
+        
+        if not user_id:
+            return Response({
+                'error': 'user_id is required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            target_user = User.objects.get(id=user_id)
+            
+            # Check if user has an email
+            if not target_user.email:
+                return Response({
+                    'error': 'User does not have an email address.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Generate reset token
+            token = generate_reset_token()
+            PasswordResetToken.objects.create(
+                user=target_user,
+                token=token
+            )
+            
+            # Send reset email
+            send_password_reset_email(target_user.email, token)
+            
+            # Log admin activity
+            from .models import AdminActivityLog
+            AdminActivityLog.objects.create(
+                admin_user=request.user,
+                action='OTHER',
+                target_user=target_user,
+                description=f"Sent password reset link to user: {target_user.username}",
+                ip_address=self.get_client_ip(request)
+            )
+            
+            # Log in AccountHistory
+            AccountHistory.objects.create(
+                user=target_user,
+                event_type='PASSWORD_RESET_INITIATED',
+                performed_by=request.user,
+                description=f"Admin {request.user.username} sent password reset link",
+                ip_address=self.get_client_ip(request)
+            )
+            
+            return Response({
+                'message': f'Password reset link sent successfully to {target_user.email}.'
+            }, status=status.HTTP_200_OK)
+        
+        except User.DoesNotExist:
+            return Response({
+                'error': 'User not found.'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+
+class ToggleUserActiveView(APIView):
+    """Allow admins to restrict/unrestrict user accounts"""
+    permission_classes = (IsAuthenticated,)
+    
+    def get_client_ip(self, request):
+        """Get client IP address from request"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+    
+    def post(self, request):
+        # Only superusers can restrict/unrestrict accounts
+        if not request.user.is_superuser:
+            return Response({
+                'error': 'Only super users can restrict/unrestrict user accounts.'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        user_id = request.data.get('user_id')
+        
+        if not user_id:
+            return Response({
+                'error': 'user_id is required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            target_user = User.objects.get(id=user_id)
+            
+            # Don't allow restricting yourself
+            if target_user.id == request.user.id:
+                return Response({
+                    'error': 'You cannot restrict your own account.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Toggle active status
+            target_user.is_active = not target_user.is_active
+            target_user.save()
+            
+            action_description = "restricted" if not target_user.is_active else "unrestricted"
+            event_type = "RESTRICTED" if not target_user.is_active else "UNRESTRICTED"
+            
+            # Log admin activity
+            from .models import AdminActivityLog
+            AdminActivityLog.objects.create(
+                admin_user=request.user,
+                action='OTHER',
+                target_user=target_user,
+                description=f"{action_description.capitalize()} user account: {target_user.username}",
+                ip_address=self.get_client_ip(request)
+            )
+            
+            # Log in AccountHistory
+            AccountHistory.objects.create(
+                user=target_user,
+                event_type=event_type,
+                performed_by=request.user,
+                description=f"Admin {request.user.username} {action_description} the account",
+                ip_address=self.get_client_ip(request)
+            )
+            
+            return Response({
+                'message': f'User {target_user.username} has been {action_description} successfully.',
+                'is_active': target_user.is_active
+            }, status=status.HTTP_200_OK)
+        
+        except User.DoesNotExist:
+            return Response({
+                'error': 'User not found.'
+            }, status=status.HTTP_404_NOT_FOUND)

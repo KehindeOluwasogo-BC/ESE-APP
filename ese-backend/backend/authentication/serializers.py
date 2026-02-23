@@ -6,12 +6,15 @@ from .models import UserProfile, AdminActivityLog
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
+    memorable_information = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User
-        fields = ('username', 'password', 'email', 'first_name', 'last_name')
+        fields = ('username', 'password', 'email', 'first_name', 'last_name', 'memorable_information')
 
     def create(self, validated_data):
+        memorable_info = validated_data.pop('memorable_information', '')
+        
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data['email'],
@@ -19,13 +22,19 @@ class RegisterSerializer(serializers.ModelSerializer):
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', '')
         )
+        
+        # Set memorable information on profile
+        if hasattr(user, 'profile'):
+            user.profile.memorable_information = memorable_info
+            user.profile.save()
+        
         return user
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ('profile_picture', 'bio', 'created_at', 'updated_at')
+        fields = ('profile_picture', 'bio', 'memorable_information', 'created_at', 'updated_at')
         read_only_fields = ('created_at', 'updated_at')
 
 
@@ -33,10 +42,11 @@ class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     profile_picture = serializers.SerializerMethodField()
     can_revoke_admins = serializers.SerializerMethodField()
+    memorable_information = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'is_superuser', 'profile_picture', 'can_revoke_admins')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'is_superuser', 'is_active', 'profile_picture', 'can_revoke_admins', 'memorable_information')
     
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip()
@@ -50,6 +60,11 @@ class UserSerializer(serializers.ModelSerializer):
         if hasattr(obj, 'profile'):
             return obj.profile.can_revoke_admins
         return True  # Default to True for backwards compatibility
+    
+    def get_memorable_information(self, obj):
+        if hasattr(obj, 'profile'):
+            return obj.profile.memorable_information
+        return ""
 
 
 class UpdateProfilePictureSerializer(serializers.Serializer):
@@ -77,13 +92,15 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 class CreateAdminSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, validators=[validate_password])
     can_revoke_admins = serializers.BooleanField(default=True)
+    memorable_information = serializers.CharField(required=False, allow_blank=True)
     
     class Meta:
         model = User
-        fields = ('username', 'password', 'email', 'first_name', 'last_name', 'can_revoke_admins')
+        fields = ('username', 'password', 'email', 'first_name', 'last_name', 'can_revoke_admins', 'memorable_information')
     
     def create(self, validated_data):
         can_revoke_admins = validated_data.pop('can_revoke_admins', True)
+        memorable_info = validated_data.pop('memorable_information', '')
         
         user = User.objects.create_user(
             username=validated_data['username'],
@@ -95,9 +112,10 @@ class CreateAdminSerializer(serializers.ModelSerializer):
             is_staff=True
         )
         
-        # Set the can_revoke_admins permission on user profile
+        # Set the can_revoke_admins permission and memorable info on user profile
         if hasattr(user, 'profile'):
             user.profile.can_revoke_admins = can_revoke_admins
+            user.profile.memorable_information = memorable_info
             user.profile.save()
         
         return user

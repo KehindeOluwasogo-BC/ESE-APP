@@ -5,10 +5,18 @@ function Register({ onRegister, onSwitchToLogin }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [memorableQuestion, setMemorableQuestion] = useState("");
+  const [memorableAnswer, setMemorableAnswer] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const memorableQuestions = [
+    "Name of pet",
+    "Country of origin",
+    "Mother's maiden name"
+  ];
 
   const apiURL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -28,10 +36,15 @@ function Register({ onRegister, onSwitchToLogin }) {
 
     setLoading(true);
 
+    // Format memorable information as JSON
+    const memorableInfo = memorableQuestion && memorableAnswer 
+      ? JSON.stringify({ question: memorableQuestion, answer: memorableAnswer })
+      : "";
+
     fetch(`${apiURL}/api/auth/register/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, first_name: firstName, last_name: lastName, email, password }),
+      body: JSON.stringify({ username, first_name: firstName, last_name: lastName, email, memorable_information: memorableInfo, password }),
     })
       .then((response) => {
         if (!response.ok) {
@@ -49,6 +62,8 @@ function Register({ onRegister, onSwitchToLogin }) {
         setFirstName("");
         setLastName("");
         setEmail("");
+        setMemorableQuestion("");
+        setMemorableAnswer("");
         setPassword("");
         setConfirmPassword("");
       })
@@ -117,6 +132,42 @@ function Register({ onRegister, onSwitchToLogin }) {
             autoComplete="email"
           />
         </div>
+
+        <div className="form-group">
+          <label htmlFor="memorableQuestion">Security Question (Optional)</label>
+          <select
+            id="memorableQuestion"
+            className="input input__lg"
+            value={memorableQuestion}
+            onChange={(e) => {
+              setMemorableQuestion(e.target.value);
+              if (!e.target.value) setMemorableAnswer("");
+            }}
+            autoComplete="off"
+          >
+            <option value="">Select a question...</option>
+            {memorableQuestions.map((question) => (
+              <option key={question} value={question}>
+                {question}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {memorableQuestion && (
+          <div className="form-group">
+            <label htmlFor="memorableAnswer">Answer</label>
+            <input
+              type="text"
+              id="memorableAnswer"
+              className="input input__lg"
+              value={memorableAnswer}
+              onChange={(e) => setMemorableAnswer(e.target.value)}
+              placeholder="Your answer"
+              autoComplete="off"
+            />
+          </div>
+        )}
 
         <div className="form-group">
           <label htmlFor="password">Password</label>

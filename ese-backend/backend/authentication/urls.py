@@ -16,7 +16,10 @@ from .views import (
     RevokeAdminPrivilegesView,
     AdminActivityLogView,
     ListUsersView,
-    CreateUserAccountView
+    CreateUserAccountView,
+    ChangeUserPasswordView,
+    SendResetLinkView,
+    ToggleUserActiveView
 )
 
 urlpatterns = [
@@ -36,4 +39,7 @@ urlpatterns = [
     # User management endpoints
     path('users/list/', ListUsersView.as_view(), name='list_users'),
     path('users/create/', CreateUserAccountView.as_view(), name='create_user'),
+    path('users/change-password/', ChangeUserPasswordView.as_view(), name='change_user_password'),
+    path('users/send-reset-link/', SendResetLinkView.as_view(), name='send_reset_link'),
+    path('users/toggle-active/', ToggleUserActiveView.as_view(), name='toggle_user_active'),
 ]

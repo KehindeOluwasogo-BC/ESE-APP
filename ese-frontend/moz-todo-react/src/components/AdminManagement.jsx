@@ -19,6 +19,14 @@ function AdminManagement() {
     last_name: "",
     can_revoke_admins: true
   });
+  const [memorableQuestion, setMemorableQuestion] = useState("");
+  const [memorableAnswer, setMemorableAnswer] = useState("");
+
+  const memorableQuestions = [
+    "Name of pet",
+    "Country of origin",
+    "Mother's maiden name"
+  ];
 
   const apiURL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -90,6 +98,11 @@ function AdminManagement() {
     setError("");
     setSuccess("");
 
+    // Format memorable information as JSON
+    const memorableInfo = memorableQuestion && memorableAnswer 
+      ? JSON.stringify({ question: memorableQuestion, answer: memorableAnswer })
+      : "";
+
     const token = localStorage.getItem('access_token');
     try {
       const response = await fetch(`${apiURL}/api/auth/admin/create/`, {
@@ -98,7 +111,10 @@ function AdminManagement() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          memorable_information: memorableInfo
+        }),
       });
 
       const data = await response.json();
@@ -113,6 +129,8 @@ function AdminManagement() {
           last_name: "",
           can_revoke_admins: true
         });
+        setMemorableQuestion("");
+        setMemorableAnswer("");
         fetchAdmins();
         fetchActivityLogs();
       } else {
@@ -359,6 +377,54 @@ function AdminManagement() {
                 }}
               />
             </div>
+
+            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+              <label htmlFor="memorable_question">Security Question (Optional)</label>
+              <select
+                id="memorable_question"
+                value={memorableQuestion}
+                onChange={(e) => {
+                  setMemorableQuestion(e.target.value);
+                  if (!e.target.value) setMemorableAnswer("");
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.8rem',
+                  fontSize: '1rem',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  backgroundColor: 'white',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="">Select a question...</option>
+                {memorableQuestions.map((question) => (
+                  <option key={question} value={question}>
+                    {question}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {memorableQuestion && (
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label htmlFor="memorable_answer">Answer</label>
+                <input
+                  type="text"
+                  id="memorable_answer"
+                  value={memorableAnswer}
+                  onChange={(e) => setMemorableAnswer(e.target.value)}
+                  placeholder="Your answer"
+                  style={{
+                    width: '100%',
+                    padding: '0.8rem',
+                    fontSize: '1rem',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px'
+                  }}
+                />
+              </div>
+            )}
 
             <div className="form-group" style={{ 
               marginBottom: '1.5rem',

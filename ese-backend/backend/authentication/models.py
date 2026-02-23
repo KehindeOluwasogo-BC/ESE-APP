@@ -10,6 +10,7 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     profile_picture = models.URLField(max_length=500, blank=True, null=True)
     bio = models.TextField(blank=True)
+    memorable_information = models.TextField(blank=True, help_text="Memorable information for account recovery")
     can_revoke_admins = models.BooleanField(default=True, help_text="Can this admin revoke other admin privileges")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
