@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
-from .models import UserProfile
+from .models import UserProfile, AdminActivityLog
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -32,10 +32,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     profile_picture = serializers.SerializerMethodField()
+    can_revoke_admins = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'is_superuser', 'profile_picture')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'is_superuser', 'profile_picture', 'can_revoke_admins')
     
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip()
@@ -44,6 +45,11 @@ class UserSerializer(serializers.ModelSerializer):
         if hasattr(obj, 'profile') and obj.profile.profile_picture:
             return obj.profile.profile_picture
         return None
+    
+    def get_can_revoke_admins(self, obj):
+        if hasattr(obj, 'profile'):
+            return obj.profile.can_revoke_admins
+        return True  # Default to True for backwards compatibility
 
 
 class UpdateProfilePictureSerializer(serializers.Serializer):
@@ -67,3 +73,68 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     def validate_new_password(self, value):
         """Validate the new password"""
         return value
+
+class CreateAdminSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+    can_revoke_admins = serializers.BooleanField(default=True)
+    
+    class Meta:
+        model = User
+        fields = ('username', 'password', 'email', 'first_name', 'last_name', 'can_revoke_admins')
+    
+    def create(self, validated_data):
+        can_revoke_admins = validated_data.pop('can_revoke_admins', True)
+        
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            password=validated_data['password'],
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', ''),
+            is_superuser=True,
+            is_staff=True
+        )
+        
+        # Set the can_revoke_admins permission on user profile
+        if hasattr(user, 'profile'):
+            user.profile.can_revoke_admins = can_revoke_admins
+            user.profile.save()
+        
+        return user
+
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+    date_joined = serializers.DateTimeField(read_only=True)
+    last_login = serializers.DateTimeField(read_only=True)
+    can_revoke_admins = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = User
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'full_name', 
+                  'is_superuser', 'is_staff', 'date_joined', 'last_login', 'can_revoke_admins')
+    
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}".strip() or obj.username
+    
+    def get_can_revoke_admins(self, obj):
+        if hasattr(obj, 'profile'):
+            return obj.profile.can_revoke_admins
+        return True  # Default to True for backwards compatibility
+
+
+class AdminActivityLogSerializer(serializers.ModelSerializer):
+    admin_username = serializers.CharField(source='admin_user.username', read_only=True)
+    admin_full_name = serializers.SerializerMethodField()
+    target_username = serializers.CharField(source='target_user.username', read_only=True, allow_null=True)
+    action_display = serializers.CharField(source='get_action_display', read_only=True)
+    
+    class Meta:
+        model = AdminActivityLog
+        fields = ('id', 'admin_user', 'admin_username', 'admin_full_name', 
+                  'action', 'action_display', 'target_user', 'target_username', 
+                  'description', 'timestamp', 'ip_address')
+        read_only_fields = ('timestamp',)
+    
+    def get_admin_full_name(self, obj):
+        return f"{obj.admin_user.first_name} {obj.admin_user.last_name}".strip() or obj.admin_user.username

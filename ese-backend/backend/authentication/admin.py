@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import PasswordResetToken, PasswordResetAttempt, UserProfile
+from .models import PasswordResetToken, PasswordResetAttempt, UserProfile, AdminActivityLog
 
 
 @admin.register(UserProfile)
@@ -24,3 +24,12 @@ class PasswordResetAttemptAdmin(admin.ModelAdmin):
     list_filter = ('created_at',)
     search_fields = ('email',)
     readonly_fields = ('created_at',)
+
+
+@admin.register(AdminActivityLog)
+class AdminActivityLogAdmin(admin.ModelAdmin):
+    list_display = ('admin_user', 'action', 'target_user', 'timestamp', 'ip_address')
+    list_filter = ('action', 'timestamp')
+    search_fields = ('admin_user__username', 'target_user__username', 'description')
+    readonly_fields = ('timestamp',)
+    date_hierarchy = 'timestamp'

@@ -184,3 +184,185 @@ class UpdateProfilePictureView(APIView):
             }, status=status.HTTP_200_OK)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CreateAdminView(APIView):
+    """Allow super users to create other admin users"""
+    permission_classes = (IsAuthenticated,)
+    
+    def get_client_ip(self, request):
+        """Get client IP address from request"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+    
+    def post(self, request):
+        # Check if requesting user is a superuser
+        if not request.user.is_superuser:
+            return Response({
+                'error': 'Only super users can create admin accounts.'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        from .serializers import CreateAdminSerializer
+        serializer = CreateAdminSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            new_admin = serializer.save()
+            
+            # Log the activity
+            from .models import AdminActivityLog
+            AdminActivityLog.objects.create(
+                admin_user=request.user,
+                action='CREATE_ADMIN',
+                target_user=new_admin,
+                description=f"Created admin user: {new_admin.username}",
+                ip_address=self.get_client_ip(request)
+            )
+            
+            return Response({
+                'message': f'Admin user {new_admin.username} created successfully.',
+                'user': {
+                    'id': new_admin.id,
+                    'username': new_admin.username,
+                    'email': new_admin.email,
+                    'first_name': new_admin.first_name,
+                    'last_name': new_admin.last_name
+                }
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ListAdminsView(APIView):
+    """List all admin users - only accessible by super users"""
+    permission_classes = (IsAuthenticated,)
+    
+    def get(self, request):
+        if not request.user.is_superuser:
+            return Response({
+                'error': 'Only super users can view admin list.'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        from .serializers import AdminUserSerializer
+        admins = User.objects.filter(is_superuser=True).order_by('-date_joined')
+        serializer = AdminUserSerializer(admins, many=True)
+        
+        return Response({
+            'admins': serializer.data,
+            'count': admins.count()
+        }, status=status.HTTP_200_OK)
+
+
+class RevokeAdminPrivilegesView(APIView):
+    """Revoke admin privileges from a user"""
+    permission_classes = (IsAuthenticated,)
+    
+    def get_client_ip(self, request):
+        """Get client IP address from request"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+    
+    def post(self, request):
+        if not request.user.is_superuser:
+            return Response({
+                'error': 'Only super users can revoke admin privileges.'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        # Check if the requesting admin has permission to revoke
+        if hasattr(request.user, 'profile') and not request.user.profile.can_revoke_admins:
+            return Response({
+                'error': 'You do not have permission to revoke admin privileges.'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        user_id = request.data.get('user_id')
+        
+        if not user_id:
+            return Response({
+                'error': 'user_id is required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            target_user = User.objects.get(id=user_id)
+            
+            # Prevent self-revocation
+            if target_user.id == request.user.id:
+                return Response({
+                    'error': 'You cannot revoke your own admin privileges.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if target is actually an admin
+            if not target_user.is_superuser:
+                return Response({
+                    'error': 'This user is not an admin.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Revoke privileges
+            target_user.is_superuser = False
+            target_user.is_staff = False
+            target_user.save()
+            
+            # Log the activity
+            from .models import AdminActivityLog
+            AdminActivityLog.objects.create(
+                admin_user=request.user,
+                action='REVOKE_ADMIN',
+                target_user=target_user,
+                description=f"Revoked admin privileges from: {target_user.username}",
+                ip_address=self.get_client_ip(request)
+            )
+            
+            return Response({
+                'message': f'Admin privileges revoked from {target_user.username}.'
+            }, status=status.HTTP_200_OK)
+        
+        except User.DoesNotExist:
+            return Response({
+                'error': 'User not found.'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+
+class AdminActivityLogView(APIView):
+    """View admin activity logs - only accessible by super users"""
+    permission_classes = (IsAuthenticated,)
+    
+    def get(self, request):
+        if not request.user.is_superuser:
+            return Response({
+                'error': 'Only super users can view activity logs.'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        from .models import AdminActivityLog
+        from .serializers import AdminActivityLogSerializer
+        
+        # Get optional filters
+        limit = request.query_params.get('limit', 50)
+        action = request.query_params.get('action', None)
+        
+        logs = AdminActivityLog.objects.all()
+        
+        # Filter by action if specified
+        if action:
+            logs = logs.filter(action=action)
+        
+        # Limit results
+        try:
+            limit = int(limit)
+            if limit > 500:
+                limit = 500  # Max limit
+        except ValueError:
+            limit = 50
+        
+        logs = logs[:limit]
+        serializer = AdminActivityLogSerializer(logs, many=True)
+        
+        return Response({
+            'logs': serializer.data,
+            'count': len(serializer.data)
+        }, status=status.HTTP_200_OK)

@@ -10,7 +10,11 @@ from .views import (
     RequestPasswordResetView,
     ValidateResetTokenView,
     ResetPasswordView,
-    UpdateProfilePictureView
+    UpdateProfilePictureView,
+    CreateAdminView,
+    ListAdminsView,
+    RevokeAdminPrivilegesView,
+    AdminActivityLogView
 )
 
 urlpatterns = [
@@ -22,4 +26,9 @@ urlpatterns = [
     path('password-reset/request/', RequestPasswordResetView.as_view(), name='password_reset_request'),
     path('password-reset/validate/', ValidateResetTokenView.as_view(), name='password_reset_validate'),
     path('password-reset/confirm/', ResetPasswordView.as_view(), name='password_reset_confirm'),
+    # Admin management endpoints
+    path('admin/create/', CreateAdminView.as_view(), name='create_admin'),
+    path('admin/list/', ListAdminsView.as_view(), name='list_admins'),
+    path('admin/revoke/', RevokeAdminPrivilegesView.as_view(), name='revoke_admin'),
+    path('admin/activity-logs/', AdminActivityLogView.as_view(), name='admin_activity_logs'),
 ]

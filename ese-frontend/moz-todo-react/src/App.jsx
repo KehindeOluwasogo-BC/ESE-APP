@@ -6,6 +6,7 @@ import ForgotPassword from "./components/ForgotPassword";
 import ResetPassword from "./components/ResetPassword";
 import Booking from "./components/Booking";
 import Profile from "./components/Profile";
+import AdminManagement from "./components/AdminManagement";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
 function AuthPage() {
@@ -36,12 +37,13 @@ function AuthPage() {
 }
 
 function Dashboard() {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const isProfilePage = location.pathname === '/profile';
   const isBookingsPage = location.pathname === '/bookings' || location.pathname === '/';
+  const isAdminPage = location.pathname === '/admin';
 
   return (
     <div className="app-container">
@@ -60,6 +62,14 @@ function Dashboard() {
           >
             Profile
           </button>
+          {user?.is_superuser && (
+            <button 
+              className={`nav-button ${isAdminPage ? 'active' : ''}`}
+              onClick={() => navigate('/admin')}
+            >
+              Admin
+            </button>
+          )}
           <button className="btn btn__danger" onClick={logout}>
             Logout
           </button>
@@ -70,6 +80,7 @@ function Dashboard() {
         <Routes>
           <Route path="/bookings" element={<Booking />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/admin" element={<AdminManagement />} />
           <Route path="/" element={<Navigate to="/bookings" replace />} />
         </Routes>
       </main>

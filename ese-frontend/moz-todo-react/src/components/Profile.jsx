@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import ProfilePictureUpload from "./ProfilePictureUpload";
 
 function Profile() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [profilePicture, setProfilePicture] = useState(null);
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState("");
@@ -90,6 +92,39 @@ function Profile() {
             <span>{user?.full_name || 'N/A'}</span>
           </div>
         </div>
+
+        {/* Admin Panel Link for Super Users */}
+        {user?.is_superuser && (
+          <div style={{ 
+            marginTop: '2rem', 
+            padding: '1.5rem', 
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: '8px',
+            color: 'white',
+            textAlign: 'center'
+          }}>
+            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.6rem' }}>🔐 Admin Access</h3>
+            <p style={{ margin: '0 0 1rem 0', fontSize: '1.2rem' }}>
+              You have super user privileges. Access the admin panel to manage users and view activity logs.
+            </p>
+            <button
+              onClick={() => navigate('/admin')}
+              style={{
+                padding: '1rem 2rem',
+                fontSize: '1.1rem',
+                fontWeight: 'bold',
+                color: '#667eea',
+                background: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+              }}
+            >
+              Open Admin Panel
+            </button>
+          </div>
+        )}
 
         <div style={{ 
           marginTop: '2rem', 

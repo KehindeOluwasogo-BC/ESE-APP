@@ -10,6 +10,7 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     profile_picture = models.URLField(max_length=500, blank=True, null=True)
     bio = models.TextField(blank=True)
+    can_revoke_admins = models.BooleanField(default=True, help_text="Can this admin revoke other admin privileges")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -91,3 +92,31 @@ class PasswordResetAttempt(models.Model):
     
     def __str__(self):
         return f"Reset attempt for {self.email} at {self.created_at}"
+
+
+class AdminActivityLog(models.Model):
+    """Track activities performed by admin users"""
+    ACTION_CHOICES = [
+        ('CREATE_ADMIN', 'Created Admin User'),
+        ('REVOKE_ADMIN', 'Revoked Admin Privileges'),
+        ('LOGIN', 'Logged In'),
+        ('CREATE_BOOKING', 'Created Booking'),
+        ('UPDATE_BOOKING', 'Updated Booking'),
+        ('DELETE_BOOKING', 'Deleted Booking'),
+        ('OTHER', 'Other Action'),
+    ]
+    
+    admin_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='admin_actions')
+    action = models.CharField(max_length=50, choices=ACTION_CHOICES)
+    target_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='targeted_by_admin')
+    description = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = 'Admin Activity Log'
+        verbose_name_plural = 'Admin Activity Logs'
+    
+    def __str__(self):
+        return f"{self.admin_user.username} - {self.get_action_display()} at {self.timestamp}"
